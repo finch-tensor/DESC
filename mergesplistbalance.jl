@@ -86,7 +86,6 @@ lvl_idx = Vector{Int}()
         gfm2[p] = Vector{Int}(undef, length(idx[p]))
         nnz += length(idx[p])
     end
-    partials = Vector{Int}(undef, P)
     prefixes = Vector{Int}(undef, P + 1)
     prefixes[1] = 1
 
@@ -151,29 +150,21 @@ lvl_idx = Vector{Int}()
         c_pos, c_idx, c_lfbr, c_nz = posdata[c_proc]
         prev = (c_pos, -1)
         seen = 0
-        part = 0
         while !isempty(heap)
+            if c_pos == cap - 1 && c_idx > idxub
+                c_proc = pop!(heap)
+                c_pos, c_idx, c_lfbr, c_nz = posdata[c_proc]
+                continue
+            end
             if (c_pos, c_idx) != prev
                 ##New position, otherwise just a new index
-                if c_pos < cap - 1 || tid == P
-                    if prev[1] != c_pos
-                        lvl_ptr[prev[1]+1] = seen
-                        seen = 0
-                    end
-                    seen += 1
-                    uq_pairs[tid+1] += 1
-                    prev = (c_pos, c_idx)
-                else
-                    if c_idx <= idxub
-                        part += 1
-                        seen += 1
-                        uq_pairs[tid+1] += 1
-                        prev = (c_pos, c_idx)
-                    else
-                        c_proc = pop!(heap)
-                        c_pos, c_idx, c_lfbr, c_nz = posdata[c_proc]
-                    end
+                if prev[1] != c_pos
+                    lvl_ptr[prev[1]+1] = seen
+                    seen = 0
                 end
+                seen += 1
+                uq_pairs[tid+1] += 1
+                prev = (c_pos, c_idx)
             end
             delta = ptr[c_proc][c_lfbr + 1] - ptr[c_proc][c_lfbr]
             c_nz += 1
@@ -203,15 +194,17 @@ lvl_idx = Vector{Int}()
 
         if idxub == max_idx
             lvl_ptr[prev[1] + 1] = seen
-            partials[tid] = 0
         else
-            partials[tid] = part
+            cap -= 1
         end
         
         for p in pos+2:cap
             lvl_ptr[p] = lvl_ptr[p] + lvl_ptr[p-1]
         end
-        prefixes[tid + 1] = seen
+        prefixes[tid + 1] = lvl_ptr[cap]
+        if idxub < max_idx
+            prefixes[tid + 1] += seen
+        end
     end
 
     for p in 2:P + 1
@@ -254,7 +247,6 @@ lvl_idx = Vector{Int}()
 
             ##skip zeroes.
             while ptr[proc][lfbr + 1] - ptr[proc][lfbr] < 1 && lfbr < length(ptr[proc]) && gfm[proc][lfbr] < cap
-                lvl_ptr[gfm[proc][lfbr] + 1] = 0
                 lfbr += 1
             end
             if lfbr >= length(ptr[proc])
@@ -280,7 +272,7 @@ lvl_idx = Vector{Int}()
         seen = 0
 
         while !isempty(heap)
-            if tid < P && c_pos == cap - 1 && c_idx > idxub
+            if c_pos == cap - 1 && c_idx > idxub
                 c_proc = pop!(heap)
                 c_pos, c_idx, c_lfbr, c_nz = posdata[c_proc]
                 continue
@@ -317,9 +309,8 @@ lvl_idx = Vector{Int}()
             c_proc = pop!(heap)
             c_pos, c_idx, c_lfbr, c_nz = posdata[c_proc]
         end
-        
-        if tid > 1
-            lvl_ptr[pos] += partials[tid - 1]
+        if idxub < max_idx
+            cap -= 1
         end
         for p in pos+1:cap
             lvl_ptr[p] += prefixes[tid]
