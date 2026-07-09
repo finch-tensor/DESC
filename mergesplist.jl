@@ -61,18 +61,18 @@ end
     end
 end
 
-P = 2
-max_pos = 10
-gfm = [[1, 2, 3, 4, 5, 6, 7, 8, 9, 10], [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]] #implicitly sorted by task first then local fiber. 
-ptr = [[1, 1, 1, 2, 3, 5, 5, 5, 6, 6, 7], [1, 1, 1, 1, 1, 2, 2, 2, 3, 3, 4]]
-idx = [[6, 4, 4, 5, 3, 7], [5, 3, 7]]
-lvl_ptr = Vector{Int}()
-lvl_idx = Vector{Int}()
+# P = 2
+# max_pos = 10
+# gfm = [[1, 2, 3, 4, 5, 6, 7, 8, 9, 10], [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]] #implicitly sorted by task first then local fiber. 
+# ptr = [[1, 1, 1, 2, 3, 5, 5, 5, 6, 6, 7], [1, 1, 1, 1, 1, 2, 2, 2, 3, 3, 4]]
+# idx = [[6, 4, 4, 5, 3, 7], [5, 3, 7]]
+# lvl_ptr = Vector{Int}()
+# lvl_idx = Vector{Int}()
 
 ##We could perhaps additionally implement a load balancer
 ##that has each processor use binary searches amongst positions to find an even partiiton.
 ##For now, we assume an even partition (each thread statically assigned 1/P positions)
-@inbounds function merge(gfm, ptr, idx, P, max_pos, lvl_ptr, lvl_idx)
+@inbounds function merge_splist(gfm, ptr, idx, P, max_pos, lvl_ptr, lvl_idx)
     resize!(lvl_ptr, max_pos + 1)
     lvl_ptr[1] = 1
     uq_pairs = Vector{Int}(undef, P + 1)
@@ -253,8 +253,8 @@ lvl_idx = Vector{Int}()
     return gfm2, uq_pairs[end]
 end
 
-gfm2, nmax_pos = merge(gfm, ptr, idx, P, max_pos, lvl_ptr, lvl_idx)
-println(lvl_ptr)
-println(lvl_idx)
-println(gfm2)
-println(nmax_pos)
+# gfm2, nmax_pos = merge(gfm, ptr, idx, P, max_pos, lvl_ptr, lvl_idx)
+# println(lvl_ptr)
+# println(lvl_idx)
+# println(gfm2)
+# println(nmax_pos)

@@ -1,6 +1,9 @@
 using Finch
 using BenchmarkTools
 using SparseArrays
+using Random
+
+# Random.seed!(1234)
 
 const P = 8
 const n = 10000
@@ -77,7 +80,7 @@ include("./mergedense.jl")
 
 function merge_parallel(gfm, ptr, idx, P, max_pos, max_idx, lvl_ptr, lvl_idx, val, lvl_val)
     unwrap_dense(gfm, max_idx, P)
-    gfm2, max_pos2 = merge(gfm, ptr, idx, P, max_pos, lvl_ptr, lvl_idx)
+    gfm2, max_pos2 = merge_splist(gfm, ptr, idx, P, max_pos, lvl_ptr, lvl_idx)
     merge_element(gfm2, val, max_pos2, P, lvl_val)
 end
 
@@ -98,6 +101,37 @@ lvl_val = Vector{Float64}()
 global_fbr_map0 = [[1] for _ in 1:P]
 
 merge_parallel(global_fbr_map0, ptr, idx, P, max_dim, n, lvl_ptr, lvl_idx, val, lvl_val)
+
+@assert lvl_ptr == B.lvl.lvl.ptr
+@assert lvl_idx == B.lvl.lvl.idx
+@assert lvl_val == B.lvl.lvl.lvl.val
+
+
+println("Benchmarking Parallel Algorithm with Balancer:")
+
+include("./mergesplistbalance.jl")
+
+function merge_parallel_balance(gfm, ptr, idx, P, max_pos, max_idx, lvl_ptr, lvl_idx, val, lvl_val)
+    unwrap_dense(gfm, max_idx, P)
+    gfm2, max_pos2 = merge_splist_balance(gfm, ptr, idx, P, max_pos, max_idx, lvl_ptr, lvl_idx)
+    merge_element(gfm2, val, max_pos2, P, lvl_val)
+end
+
+respb = @benchmark merge_parallel_balance(gfm, ptr, idx, $P, $max_dim, $n, lvl_ptr, lvl_idx, $val, lvl_val) setup=(
+    gfm = [[1] for _ in 1:$P];
+    lvl_ptr = Vector{Int}();
+    lvl_idx = Vector{Int}();
+    lvl_val = Vector{Float64}()
+) evals=1
+
+display(respb)
+
+lvl_ptr = Vector{Int}()
+lvl_idx = Vector{Int}()
+lvl_val = Vector{Float64}()
+global_fbr_map0 = [[1] for _ in 1:P]
+
+merge_parallel_balance(global_fbr_map0, ptr, idx, P, max_dim, n, lvl_ptr, lvl_idx, val, lvl_val)
 
 @assert lvl_ptr == B.lvl.lvl.ptr
 @assert lvl_idx == B.lvl.lvl.idx
