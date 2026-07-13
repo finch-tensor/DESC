@@ -1,7 +1,7 @@
 using Finch
 using BenchmarkTools
 using SparseArrays
-using Random
+# using Random
 
 # Random.seed!(1234)
 
@@ -86,7 +86,7 @@ end
 
 max_dim = n
 
-resp = @benchmark merge_parallel(gfm, ptr, idx, $P, $max_dim, $n, lvl_ptr, lvl_idx, $val, lvl_val) setup=(
+resp = @benchmark merge_parallel(gfm, $ptr, $idx, $P, $max_dim, $n, lvl_ptr, lvl_idx, $val, lvl_val) setup=(
     gfm = [[1] for _ in 1:$P];
     lvl_ptr = Vector{Int}();
     lvl_idx = Vector{Int}();
@@ -117,7 +117,7 @@ function merge_parallel_balance(gfm, ptr, idx, P, max_pos, max_idx, lvl_ptr, lvl
     merge_element(gfm2, val, max_pos2, P, lvl_val)
 end
 
-respb = @benchmark merge_parallel_balance(gfm, ptr, idx, $P, $max_dim, $n, lvl_ptr, lvl_idx, $val, lvl_val) setup=(
+respb = @benchmark merge_parallel_balance(gfm, $ptr, $idx, $P, $max_dim, $n, lvl_ptr, lvl_idx, $val, lvl_val) setup=(
     gfm = [[1] for _ in 1:$P];
     lvl_ptr = Vector{Int}();
     lvl_idx = Vector{Int}();

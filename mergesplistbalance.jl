@@ -64,9 +64,6 @@ end
 
 include("./balancer.jl")
 
-# lvl_ptr = Vector{Int}()
-# lvl_idx = Vector{Int}()
-
 # P = 8
 # max_pos = 5
 # max_idx = 5
@@ -82,6 +79,19 @@ include("./balancer.jl")
 # ptr = [[1, 1, 1, 2, 3, 5, 5, 5, 6, 6, 7], [1, 1, 1, 1, 1, 2, 2, 2, 3, 3, 4]]
 # idx = [[6, 4, 4, 5, 3, 7], [5, 3, 7]]
 
+# P = 8
+# max_idx = 10
+# max_pos = 10
+# gfm = [[2, 3, 4, 5, 7, 8], [1, 3, 4, 5, 6, 7, 8, 9, 10], [1, 2, 3, 4, 5, 7, 9], [1, 2, 4, 6, 9, 10], 
+#     [1, 3, 6, 7, 9], [2, 4, 5, 6, 7, 8, 9, 10], [4, 5, 6, 7, 8, 9, 10], [1, 2, 3, 4, 5, 7, 9, 10]]
+# ptr = [[1, 2, 4, 6, 7, 10, 14], [1, 4, 5, 6, 7, 9, 10, 12, 13, 16], [1, 2, 4, 5, 6, 7, 9, 13], [1, 2, 4, 6, 8, 12, 14],
+#      [1, 2, 5, 7, 9, 12], [1, 2, 4, 7, 9, 10, 11, 12, 13], [1, 2, 5, 7, 9, 10, 11, 12], [1, 5, 7, 8, 10, 11, 15, 16, 18]]
+# idx = [[1, 6, 7, 4, 6, 2, 2, 5, 10, 5, 6, 7, 10], [1, 7, 9, 1, 2, 8, 3, 5, 1, 1, 5, 4, 3, 4, 9], [5, 6, 9, 3, 8, 6, 3, 4, 2, 6, 8, 10], [1, 8, 10, 4, 9, 3, 6, 2, 4, 7, 10, 3, 10], 
+#     [3, 1, 2, 10, 5, 8, 1, 5, 2, 5, 9], [7, 3, 10, 1, 2, 10, 3, 8, 4, 5, 10, 10], [9, 3, 4, 6, 5, 6, 3, 9, 4, 9, 10],
+#     [3, 5, 6, 8, 1, 8, 6, 2, 7, 10, 1, 2, 6, 10, 5, 4, 7]]
+
+# lvl_ptr = Vector{Int}()
+# lvl_idx = Vector{Int}()
 
 
 ##We could perhaps additionally implement a load balancer
@@ -137,6 +147,10 @@ include("./balancer.jl")
             lo, hi = 1, length(gfm[proc])
             lfbr = binary_search_lb(pos, gfm[proc], lo, hi)
 
+            if lfbr < 1
+                continue
+            end
+
             ##skip zeroes.
             while ptr[proc][lfbr + 1] - ptr[proc][lfbr] < 1 && lfbr < length(ptr[proc]) && gfm[proc][lfbr] < cap
                 lvl_ptr[gfm[proc][lfbr] + 1] = 0
@@ -175,8 +189,11 @@ include("./balancer.jl")
         c_pos, c_idx, c_lfbr, c_nz = posdata[c_proc]
         prev = (c_pos, -1)
         seen = 0
+        start_pos = c_pos
+        deferred = false
         while !isempty(heap)
             if c_pos == cap - 1 && c_idx > idxub
+                deferred = true #another thread owns the data
                 c_proc = pop!(heap)
                 c_pos, c_idx, c_lfbr, c_nz = posdata[c_proc]
                 continue
@@ -217,13 +234,16 @@ include("./balancer.jl")
             c_pos, c_idx, c_lfbr, c_nz = posdata[c_proc]
         end
 
-        if idxub == max_idx
+        boundary = cap - 1
+        is_writer = (prev[1] < boundary) || !deferred
+        if is_writer
             lvl_ptr[prev[1] + 1] = seen
+            cap = prev[1] + 1
         else
-            cap -= 1
+            cap = boundary
         end
 
-        for p in pos+2:cap
+        for p in start_pos+2:cap
             lvl_ptr[p] = lvl_ptr[p] + lvl_ptr[p-1]
         end
 
@@ -233,6 +253,7 @@ include("./balancer.jl")
         uq_pairs[p] += uq_pairs[p - 1]
         prefixes[p] += prefixes[p - 1]
     end
+
     resize!(lvl_idx, uq_pairs[end])
     lvl_ptr[1] = 1
 
@@ -269,6 +290,9 @@ include("./balancer.jl")
         for proc in 1:P
             lo, hi = 1, length(gfm[proc])
             lfbr = binary_search_lb(pos, gfm[proc], lo, hi)
+            if lfbr < 1
+                continue
+            end
 
             ##skip zeroes.
             while ptr[proc][lfbr + 1] - ptr[proc][lfbr] < 1 && lfbr < length(ptr[proc]) && gfm[proc][lfbr] < cap
@@ -306,9 +330,12 @@ include("./balancer.jl")
         c_pos, c_idx, c_lfbr, c_nz = posdata[c_proc]
         prev = (c_pos, -1)
         seen = 0
+        start_pos = c_pos
+        deferred = false
 
         while !isempty(heap)
             if c_pos == cap - 1 && c_idx > idxub
+                deferred = true
                 c_proc = pop!(heap)
                 c_pos, c_idx, c_lfbr, c_nz = posdata[c_proc]
                 continue
@@ -345,19 +372,20 @@ include("./balancer.jl")
             c_proc = pop!(heap)
             c_pos, c_idx, c_lfbr, c_nz = posdata[c_proc]
         end
-        if idxub < max_idx
-            cap -= 1
-        end
-        for p in pos+1:cap
+
+        boundary = cap - 1
+        is_writer = (prev[1] < boundary) || !deferred
+        cap = is_writer ? prev[1] + 1 : boundary
+
+        for p in start_pos+1:cap
             lvl_ptr[p] += prefixes[tid]
         end
     end
     return gfm2, uq_pairs[end]
 end
 
-# max_idx = max_pos
 # gfm2, nmax_pos = merge_splist_balance(gfm, ptr, idx, P, max_pos, max_idx, lvl_ptr, lvl_idx)
 # println(lvl_ptr)
 # println(lvl_idx)
 # println(gfm2)
-# # println(nmax_pos)
+# println(nmax_pos)

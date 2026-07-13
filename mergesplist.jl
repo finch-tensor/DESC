@@ -69,6 +69,9 @@ end
 # lvl_ptr = Vector{Int}()
 # lvl_idx = Vector{Int}()
 
+# P = 8
+# max_pos = 1
+
 ##We could perhaps additionally implement a load balancer
 ##that has each processor use binary searches amongst positions to find an even partiiton.
 ##For now, we assume an even partition (each thread statically assigned 1/P positions)
