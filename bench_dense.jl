@@ -113,7 +113,7 @@ include("./mergesplistbalance.jl")
 
 function merge_parallel_balance(gfm, ptr, idx, P, max_pos, max_idx, lvl_ptr, lvl_idx, val, lvl_val)
     unwrap_dense(gfm, max_idx, P)
-    gfm2, max_pos2 = merge_splist_balance(gfm, ptr, idx, P, max_pos, max_idx, lvl_ptr, lvl_idx)
+    gfm2, max_pos2 = merge_splist_balance(gfm, ptr, idx, P, max_pos, max_idx, true, lvl_ptr, lvl_idx)
     merge_element(gfm2, val, max_pos2, P, lvl_val)
 end
 

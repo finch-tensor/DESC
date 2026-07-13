@@ -76,20 +76,8 @@ include("./balancer.jl")
 # max_idx = 10
 # max_pos = 10
 # gfm = [[1, 2, 3, 4, 5, 6, 7, 8, 9, 10], [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]] #implicitly sorted by task first then local fiber. 
-# ptr = [[1, 1, 1, 2, 3, 5, 5, 5, 6, 6, 7], [1, 1, 1, 1, 1, 2, 2, 2, 3, 3, 4]]
-# idx = [[6, 4, 4, 5, 3, 7], [5, 3, 7]]
-
-# P = 8
-# max_idx = 10
-# max_pos = 10
-# gfm = [[2, 3, 4, 5, 7, 8], [1, 3, 4, 5, 6, 7, 8, 9, 10], [1, 2, 3, 4, 5, 7, 9], [1, 2, 4, 6, 9, 10], 
-#     [1, 3, 6, 7, 9], [2, 4, 5, 6, 7, 8, 9, 10], [4, 5, 6, 7, 8, 9, 10], [1, 2, 3, 4, 5, 7, 9, 10]]
-# ptr = [[1, 2, 4, 6, 7, 10, 14], [1, 4, 5, 6, 7, 9, 10, 12, 13, 16], [1, 2, 4, 5, 6, 7, 9, 13], [1, 2, 4, 6, 8, 12, 14],
-#      [1, 2, 5, 7, 9, 12], [1, 2, 4, 7, 9, 10, 11, 12, 13], [1, 2, 5, 7, 9, 10, 11, 12], [1, 5, 7, 8, 10, 11, 15, 16, 18]]
-# idx = [[1, 6, 7, 4, 6, 2, 2, 5, 10, 5, 6, 7, 10], [1, 7, 9, 1, 2, 8, 3, 5, 1, 1, 5, 4, 3, 4, 9], [5, 6, 9, 3, 8, 6, 3, 4, 2, 6, 8, 10], [1, 8, 10, 4, 9, 3, 6, 2, 4, 7, 10, 3, 10], 
-#     [3, 1, 2, 10, 5, 8, 1, 5, 2, 5, 9], [7, 3, 10, 1, 2, 10, 3, 8, 4, 5, 10, 10], [9, 3, 4, 6, 5, 6, 3, 9, 4, 9, 10],
-#     [3, 5, 6, 8, 1, 8, 6, 2, 7, 10, 1, 2, 6, 10, 5, 4, 7]]
-
+# ptr = [[1, 1, 1, 1, 2, 4, 4, 4, 4, 4, 4], [1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2]]
+# idx = [[4, 4, 5], [6]]
 # lvl_ptr = Vector{Int}()
 # lvl_idx = Vector{Int}()
 
@@ -97,7 +85,7 @@ include("./balancer.jl")
 ##We could perhaps additionally implement a load balancer
 ##that has each processor use binary searches amongst positions to find an even partiiton.
 ##For now, we assume an even partition (each thread statically assigned 1/P positions)
-@inbounds function merge_splist_balance(gfm, ptr, idx, P, max_pos, max_idx, lvl_ptr, lvl_idx)
+@inbounds function merge_splist_balance(gfm, ptr, idx, P, max_pos, max_idx, was_dense, lvl_ptr, lvl_idx)
     resize!(lvl_ptr, max_pos + 1)
     lvl_ptr[1] = 0
     uq_pairs = Vector{Int}(undef, P + 1)
@@ -189,7 +177,7 @@ include("./balancer.jl")
         c_pos, c_idx, c_lfbr, c_nz = posdata[c_proc]
         prev = (c_pos, -1)
         seen = 0
-        start_pos = c_pos
+        start_pos = was_dense ? pos : c_pos
         deferred = false
         while !isempty(heap)
             if c_pos == cap - 1 && c_idx > idxub
@@ -241,6 +229,10 @@ include("./balancer.jl")
             cap = prev[1] + 1
         else
             cap = boundary
+        end
+
+        if tid == P
+            cap = length(lvl_ptr)
         end
 
         for p in start_pos+2:cap
@@ -330,7 +322,7 @@ include("./balancer.jl")
         c_pos, c_idx, c_lfbr, c_nz = posdata[c_proc]
         prev = (c_pos, -1)
         seen = 0
-        start_pos = c_pos
+        start_pos = was_dense ? pos : c_pos
         deferred = false
 
         while !isempty(heap)
@@ -377,6 +369,10 @@ include("./balancer.jl")
         is_writer = (prev[1] < boundary) || !deferred
         cap = is_writer ? prev[1] + 1 : boundary
 
+        if tid == P
+            cap = length(lvl_ptr)
+        end
+
         for p in start_pos+1:cap
             lvl_ptr[p] += prefixes[tid]
         end
@@ -384,7 +380,7 @@ include("./balancer.jl")
     return gfm2, uq_pairs[end]
 end
 
-# gfm2, nmax_pos = merge_splist_balance(gfm, ptr, idx, P, max_pos, max_idx, lvl_ptr, lvl_idx)
+# gfm2, nmax_pos = merge_splist_balance(gfm, ptr, idx, P, max_pos, max_idx, true, lvl_ptr, lvl_idx)
 # println(lvl_ptr)
 # println(lvl_idx)
 # println(gfm2)

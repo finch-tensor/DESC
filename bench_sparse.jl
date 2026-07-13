@@ -88,8 +88,8 @@ println("Benchmarking Parallel Algorithm with Balancer:")
 include("./mergesplistbalance.jl")
 
 function merge_parallel_balance(gfm, ptr, idx, ptr2, idx2, P, max_pos, max_idx, lvl_ptr, lvl_idx, lvl2_ptr, lvl2_idx, val, lvl_val)
-    gfm1, max_pos1 = merge_splist_balance(gfm, ptr, idx, P, max_pos, max_idx, lvl_ptr, lvl_idx)
-    gfm2, max_pos2 = merge_splist_balance(gfm1, ptr2, idx2, P, max_pos1, max_idx, lvl2_ptr, lvl2_idx)
+    gfm1, max_pos1 = merge_splist_balance(gfm, ptr, idx, P, max_pos, max_idx, false, lvl_ptr, lvl_idx)
+    gfm2, max_pos2 = merge_splist_balance(gfm1, ptr2, idx2, P, max_pos1, max_idx, false, lvl2_ptr, lvl2_idx)
     merge_element(gfm2, val, max_pos2, P, lvl_val)
 end
 
