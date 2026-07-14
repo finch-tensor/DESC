@@ -37,7 +37,7 @@ end
 
 @inbounds function merge_splist_weak(gfm, ptr, idx, P, max_pos, max_idx, was_dense, lvl_ptr, lvl_idx)
     resize!(lvl_ptr, max_pos + 1)
-    lvl_ptr[1] = 0
+    fill!(lvl_ptr, 0)
     gfm2 = Vector{Vector{Int}}(undef, P)
     nnz = 0
     for p in 1:P
@@ -56,7 +56,7 @@ end
             uq_pairs_prior = 0
         else
             lb = find_split(work_lb, max_pos, max_idx, ptr, idx, gfm, P)
-            uq_pairs_prior = total_idx(lb[2], lb[1], ptr, idx, gfm) ##Assuming no duplicates, EVERY prior (p, i) pair is unique.
+            uq_pairs_prior = total_idx(lb[2], lb[1], ptr, idx, gfm) - 1 ##Assuming no duplicates, EVERY prior (p, i) pair is unique.
         end
 
         if tid == P
@@ -70,7 +70,6 @@ end
         cap = ub[1] + 1
         idxlb = lb[2]
         idxub = ub[2]
-        println("$tid: $lb, $ub")
 
         posdata = Vector{Tuple{Int, Int, Int, Int}}(undef, P + 1)
         ord = Base.Order.Lt((i, j) -> lowerfbr(posdata[i], posdata[j]))
@@ -87,7 +86,6 @@ end
 
             ##skip zeroes.
             while ptr[proc][lfbr+1] - ptr[proc][lfbr] < 1 && lfbr < length(ptr[proc]) && gfm[proc][lfbr] < cap
-                lvl_ptr[gfm[proc][lfbr]+1] = 0
                 lfbr += 1
             end
             if lfbr >= length(ptr[proc])
@@ -172,10 +170,19 @@ end
 
         boundary = cap - 1
         is_writer = (prev[1] < boundary) || !deferred
-        cap = is_writer ? prev[1] + 1 : boundary
+        if is_writer
+            lvl_ptr[prev[1] + 1] = seen_pos
+            cap = prev[1] + 1
+        else
+            cap = boundary
+        end
 
         if tid == P
             cap = length(lvl_ptr)
+        end
+        
+        for p in start_pos+2:cap
+            lvl_ptr[p] = lvl_ptr[p] + lvl_ptr[p-1]
         end
 
         for p in start_pos+1:cap

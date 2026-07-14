@@ -87,7 +87,7 @@ include("./balancer.jl")
 ##For now, we assume an even partition (each thread statically assigned 1/P positions)
 @inbounds function merge_splist_balance(gfm, ptr, idx, P, max_pos, max_idx, was_dense, lvl_ptr, lvl_idx)
     resize!(lvl_ptr, max_pos + 1)
-    lvl_ptr[1] = 0
+    fill!(lvl_ptr, 0)
     uq_pairs = Vector{Int}(undef, P + 1)
     uq_pairs[1] = 0
     gfm2 = Vector{Vector{Int}}(undef, P)
@@ -204,7 +204,6 @@ include("./balancer.jl")
                 c_lfbr += 1
 
                 while c_lfbr < length(ptr[c_proc]) && ptr[c_proc][c_lfbr + 1] - ptr[c_proc][c_lfbr] < 1 && gfm[c_proc][c_lfbr] < cap
-                    lvl_ptr[gfm[c_proc][c_lfbr] + 1] = 0
                     c_lfbr += 1
                 end
             end
