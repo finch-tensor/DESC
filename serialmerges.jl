@@ -6,7 +6,8 @@ max_pos = 10
 # ptr = [[1, 1, 1, 1, 2, 5, 5, 5, 5, 5, 5], [1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2]]
 ptr = [[1, 2, 5], [1, 2]]
 idx = [[4, 3, 4, 5], [6]]
-pos_offsets = [[4, 8], [4, 8]]
+# pos_offsets = [[4, 8], [4, 8]]
+pos_offsets = [[1, 3], [1, 3]]
 lvl_ptr = Vector{Int}(undef, 4)
 lvl_idx = Vector{Int}(undef, 5)
 lvl_ptr[1] = 1
@@ -62,7 +63,7 @@ function setup_coalesce!(lvl::CoalesceLevel, max_pos, coalescent)
     setup_coalesce!(lvl.lvl, max_pos, coalescent)
 end
 
-function merge_splist(tid, ptr, idx, P, lvl_ptr, lvl_idx, was_dense)
+function merge_splist(tid, ptr, idx, P, lvl_ptr, lvl_idx, pos_offsets, was_dense)
     nnz_cutoffs = Vector{Int}(undef, P + 1)
     nnz_cutoffs[1] = 1
     for p in 2:P+1
@@ -184,8 +185,10 @@ function merge_splist(tid, ptr, idx, P, lvl_ptr, lvl_idx, was_dense)
                 end
             end
         end
+        for p in 1:P
+            pos_offsets[tid][p] = nnz_cutoffs[p]
+        end
     end
-
 end
 
 function merge_element(tid, val, P, lvl_val, was_dense)
@@ -217,10 +220,17 @@ function merge_element(tid, val, P, lvl_val, was_dense)
     end
 end
 
-merge_splist(1, ptr, idx, P, lvl_ptr, lvl_idx, false)
-merge_splist(2, ptr, idx, P, lvl_ptr, lvl_idx, false)
-merge_element(1, val, P, lvl_val, false)
-merge_element(2, val, P, lvl_val, false)
+# merge_splist(1, ptr, idx, P, lvl_ptr, lvl_idx, pos_offsets, false)
+# merge_splist(2, ptr, idx, P, lvl_ptr, lvl_idx, pos_offsets, false)
+# merge_element(1, val, P, lvl_val, false)
+# merge_element(2, val, P, lvl_val, false)
+
+Threads.@threads for tid in 1:P
+    merge_splist(tid, ptr, idx, P, lvl_ptr, lvl_idx, pos_offsets, false)
+    merge_element(tid, val, P, lvl_val, false)
+end
+
 println(lvl_ptr)
 println(lvl_idx)
 println(lvl_val)
+println(pos_offsets)
