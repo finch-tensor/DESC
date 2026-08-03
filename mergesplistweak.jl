@@ -6,8 +6,8 @@ P = 2
 max_idx = 10
 max_pos = 10
 gfm = [[1, 2, 3, 4, 5, 6, 7, 8, 9, 10], [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]] #implicitly sorted by task first then local fiber. 
-ptr = [[1, 1, 1, 1, 2, 4, 4, 4, 4, 4, 4], [1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2]]
-idx = [[4, 4, 5], [6]]
+ptr = [[1, 1, 1, 1, 2, 5, 5, 5, 5, 5, 5], [1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2]]
+idx = [[4, 3, 4, 5], [6]]
 lvl_ptr = Vector{Int}()
 lvl_idx = Vector{Int}()
 
@@ -85,7 +85,7 @@ end
             end
 
             ##skip zeroes.
-            while ptr[proc][lfbr+1] - ptr[proc][lfbr] < 1 && lfbr < length(ptr[proc]) && gfm[proc][lfbr] < cap
+            while lfbr < length(ptr[proc]) && ptr[proc][lfbr+1] - ptr[proc][lfbr] < 1 && gfm[proc][lfbr] < cap
                 lfbr += 1
             end
             if lfbr >= length(ptr[proc])
@@ -157,8 +157,8 @@ end
             
             if c_lfbr < length(ptr[c_proc])
                 c_gpos = gfm[c_proc][c_lfbr]
-                c_idx = idx[c_proc][ptr[c_proc][c_lfbr] + c_nz]
                 if c_gpos < cap
+                    c_idx = idx[c_proc][ptr[c_proc][c_lfbr] + c_nz]
                     posdata[c_proc] = (c_gpos, c_idx, c_lfbr, c_nz)
                     push!(heap,  c_proc)
                 end
