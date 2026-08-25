@@ -3,12 +3,12 @@ using Finch
 P = 2
 max_idx = 10
 max_pos = 10
-# ptr = [[1, 1, 1, 1, 2, 5, 5, 5, 5, 5, 5], [1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2]]
-ptr = [[1, 2, 5], [1, 2]]
+ptr = [[1, 1, 1, 1, 2, 5, 5, 5, 5, 5, 5], [1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2]]
+# ptr = [[1, 2, 5], [1, 2]]
 idx = [[4, 3, 4, 5], [6]]
-# pos_offsets = [[4, 8], [4, 8]]
-pos_offsets = [[1, 3], [1, 3]]
-lvl_ptr = Vector{Int}(undef, 4)
+pos_offsets = [[1, 1], [1, 1]]
+# pos_offsets = [[1, 3], [1, 3]]
+lvl_ptr = Vector{Int}(undef, 11)
 lvl_idx = Vector{Int}(undef, 5)
 lvl_ptr[1] = 1
 lvl_ptr[end] = 6
@@ -21,6 +21,29 @@ lvl_val = Vector{Float64}(undef, 5)
     @assert target > 0
 
     if target >= arr[hi]
+        return -1
+    end
+
+    while lo <= hi
+        mid = div(lo + hi, 2)
+        if arr[mid] <= target && arr[mid + 1] > target
+            return mid
+        elseif arr[mid] > target
+            hi = mid
+        else
+            lo = mid
+        end
+    end
+
+    return -1
+end
+
+@inbounds function binary_search_first_increase(arr)
+    lo = 1
+    hi = length(arr)
+    target = arr[lo]
+
+    if arr[hi] == target
         return -1
     end
 
@@ -81,7 +104,9 @@ function merge_splist(tid, ptr, idx, P, lvl_ptr, lvl_idx, pos_offsets, was_dense
     nz_id_lower = work_lb - nnz_cutoffs[proc_id_lower] + 1
 
     if was_dense
-        ##Optimize this pass, currently O(P * npos / P), way too slow.
+        for p in 1:P
+            pos_offsets[tid][p] = binary_search_first_increase(ptr[p])
+        end
         proc = proc_id_lower
         idx_read = nz_id_lower
         idx_write = nnz_cutoffs[proc] + nz_id_lower - 1
@@ -103,12 +128,23 @@ function merge_splist(tid, ptr, idx, P, lvl_ptr, lvl_idx, pos_offsets, was_dense
         pos_lb = 2 + pos_offset
         pos_ub = pos_lb + pos_chunksize - 1
 
+        pos_cutoffs = Vector{Int}(undef, P + 1)
+        pos_cutoffs[1] = 1
+        for p in 2:P
+            pos_cutoffs[p] = pos_offsets[tid][p]
+        end
+        pos_cutoffs[P + 1] = max_pos + 1
+
+        proc = binary_search(pos_lb - 1, pos_cutoffs)
         for pos in pos_lb:pos_ub
-            total = 1
-            for p in 1:P
-                total += ptr[p][pos] - 1
+            while proc < P && pos > pos_cutoffs[proc + 1]
+                proc += 1
             end
-            lvl_ptr[pos] = total
+            lvl_ptr[pos] = nnz_cutoffs[proc] + ptr[proc][pos] - 1
+        end
+
+        for p in 1:P
+            pos_offsets[tid][p] = nnz_cutoffs[p]
         end
     else
         work_ub = work_lb + chunksize - 1
@@ -226,7 +262,7 @@ end
 # merge_element(2, val, P, lvl_val, false)
 
 Threads.@threads for tid in 1:P
-    merge_splist(tid, ptr, idx, P, lvl_ptr, lvl_idx, pos_offsets, false)
+    merge_splist(tid, ptr, idx, P, lvl_ptr, lvl_idx, pos_offsets, true)
     merge_element(tid, val, P, lvl_val, false)
 end
 
