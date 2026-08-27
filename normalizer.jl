@@ -6,14 +6,14 @@ struct MergeNormalization end
 
 function decrement_idxs(idxs, shapes)
     idxs = copy(idxs)
-    pos = 1
-    while pos <= length(idxs)
+    pos = length(idxs)
+    while pos > 0
         if idxs[pos] > 1
             idxs[pos] -= 1
             return idxs
         else
             idxs[pos] = shapes[pos]
-            pos += 1
+            pos -= 1
         end
     end
     error("nnz too small to load balance across P processors")
